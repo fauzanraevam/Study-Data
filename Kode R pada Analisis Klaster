@@ -1,0 +1,205 @@
+---
+title: "Analisis Klaster"
+author: "Fauzan Raeva Maulana"
+date: "26/8/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Analisis Klaster
+
+<style>
+body {
+text-align: justify}
+</style>
+
+Analisis klaster adalah metode statistik yang bertujuan untuk mencari pola dari data dengan cara mengelompokkan observasi-observasi menjadi klaster-klaster.
+
+Tujuan dari analisis klaster adalah mencari pengelompokkan yang optimal dari setiap kelompok dengan setiap kelompok menunjukkan perbedaan yang signifikan.
+
+Dalam mengelompokkan data menjadi klaster, terdapat berbagai macam teknik yang digunakan yakni
+
+1. Menguji kemiripan antar pasangan observasi dengan mengukur jaraknya.
+2. Menguji berdasarkan korelasi/hubungan antar pasangan.
+
+Analisis klaster merupakan salah satu cabang dari unsupervised learning yang berkaitan dengan pengenalan pola. Banyak sekali bidang pengaplikasian dengan menggunakan teknik analisis klaster untuk mengelompokkan data seperti bidang medis, psikiater, sosiologi, kriminologi, antropologi, arkaelogi, geologi, geografi, remote sensing, penelitian pasar, ekonomi, dan engineering.
+
+Artikel ini akan membahas mengenai aplikasi dari analisis klaster pada kasus kriminalitas di Amerika Serikat berdasarkan profil wilayah.
+
+**Langkah-Langkah dalam Metode Analisis Klaster**
+
+1. Menghitung jarak.
+Menggunakan jarak Euclidean sebagai ukuran jarak.
+2. Membuat dendogram single linkage
+3. Interpretasi hasil dendogram
+
+**Masukan library yang Digunakan**
+
+
+```{r Library}
+library(readxl) #Digunakan untuk memanggil fungsi readxl untuk membaca file excel 
+library(pastecs) #Digunakan untuk memanggil fungsi stat.desc
+library(psych) #Digunakan untuk membentuk plot korelasi antar variabel
+library(tidyverse) 
+#Kelima library dibawah, digunakan dalam membangun metode analisis klaster
+library(cluster)          
+library(TSclust)
+library(factoextra)
+library(ggdendro)
+library(dendextend)
+library(stats)
+library(pdc)
+```
+
+### Input Data
+
+Berikut merupakan data dari kriminalitas dengan tiap baris menyatakan banyaknya kasus pada tiap negara bagian di Amerika Serikat.
+
+```{r Input Data}
+kriminalitas <- read_excel("C:/Users/User/Downloads/kriminalitas.xlsx")
+head(kriminalitas)
+```
+
+### Ukuran Statistika Deskriptif 
+
+Statistika deskriptif digunakan untuk memberikan gambaran dasar dari data yang digunakan. Dibawah ini, digunakan stat.desc dan summary untuk mengetahui nilai minimum, nilai maksimum, median, rataan, dll.
+
+```{r Statistika Deskriptif}
+summary(kriminalitas)
+stat.desc(kriminalitas,basic = FALSE)
+```
+
+### Mengukur Korelasi antar Variabel
+
+```{r Korelasi}
+par(mar=rep(2,4))
+pairs.panels(kriminalitas[,], 
+             method = "pearson", # Metode Korelasi
+             hist.col = "#00AFBB",
+             density = FALSE,  # Menunjukkan plot densitas
+             ellipses = FALSE, # Menunjukkan plot elips
+             cex.cor=1.5,main="Matriks Korelasi pada Kasus Kriminalitas di AS")
+```
+
+Hasil korelasi bernilai antara -1 hingga 1, dengan nilai mendekati -1 menunjukkan korelasi kuat dan negatif(hubungan yang bertolak belakang antar variabel), nilai mendekati 1 menunjukkan korelasi kuat dan positif (hubungan yang berbanding lurus antar variabel). Nilai 0 menunjukkan korelasi lemah (artinya memiliki hubungan namun sangat sedikit).
+
+Pada tabel hasil korelasi, terlihat bahwa pembunuhan dan pemerkosaan memiliki korelasi yang tinggi yakni sebesar 0,8. Ini sesuai dengan kondisi bahwa pembunuhan dan pemerkosaan merupakan penyerangan yang dapat menghasilkan korban jiwa. Sedangkan variabel kebongkaran dan pencurian juga memiliki korelasi yang cukup tinggi yakni sebesar 0,74. Ini disebabkan oleh kedua variabel memiliki hubungan yang minim akan korban jiwa, namun berfokus pada pengambilan harta benda dari seseorang.
+
+### Standarisasi Data
+Standarisasi data digunakan untuk menskalakan data menjadi range yang serupa. 
+
+```{r standarisasi Data}
+standard <- scale(kriminalitas)
+
+```
+
+### Mengukur Jarak Euclidean
+Jarak yang diukur adalah jarak tiap negara bagian dengan berdasar atas kasus kriminalitasnya.
+
+```{r Jarak Euclidean}
+d <- dist(standard)
+
+```
+
+### Membentuk Hierarchical Clustering
+Hierarchical clustering adalah suatu metode yang digunakan untuk mencari klaster yang baik dari data. Dibawah ini digunakan fungsi hclust yang berasal dari package stats.
+
+Hasil dari hierarchical clustering dapat dilihat secara grafik dengan menggunakan diagram pohon yang biasa disebut dendogram.
+
+Metode yang digunakan dalam kasus kriminalitas adalah Single Linkage. Single linkage menghitung jarak minimum antar observasi yang ditinjau
+
+```{r Hierarchical Clustering}
+hc1 <- hclust(d, method = "single" )
+dend <- as.dendrogram(hc1)
+plot(hc1)
+```
+
+### Pemilihan Banyaknya Klaster yang Dipilih
+
+Terdapat 2 prosedur yakni Mojena (1977) dan Milligan & Cooper (1985)
+
+Pada prosedur Mojena dipilih k = 2,75 hingga 3,5. Sedangkan prosedur Milligan & Cooper merekomendasikan untuk k = 1,25.
+
+```{r Banyak Klaster}
+rataan <- mean(hc1$height)
+stdev <- sd(hc1$height)
+k1 = 1.25 # Milligan & Cooper
+k2 = 2.75 # Mojena
+
+h1 = rataan + (stdev*k1)
+h2 = rataan + (stdev*k2)
+
+# Pemotongan Dendogram dengan konstanta Milligan & Cooper
+obj1 <- cut(dend, h=h1)
+den1 <- cut(dend, h=h1)$upper
+den1 <- as.dendrogram(den1)
+labels(den1) <- c("7","A1","5","11","A2")
+
+plot(den1,ylab="Height",main="Dendogram Milligan & Cooper",xlim=c(0,85),cex.lab=0.01)
+
+
+# Pemotongan Dendogram dengan Konstanta Mojena
+obj2 <- cut(dend, h=h2)
+den2 <- cut(dend, h=h2)$upper
+den2 <- as.dendrogram(den2)
+labels(den2) <- c("7","28")
+
+plot(den2,ylab="Height",main="Dendogram Mojena",xlim=c(0,85),cex.lab=0.01)
+
+```
+
+**Hasil Analisis**
+
+1. Single Linkage Lengkap (Sebelum dilakukan Pemotongan)
+
+    Terlihat bahwa terdapat 1 observasi yakni observasi ke-7 yang memiliki jarak sangat jauh. Sedangkan, 4 observasi yakni observasi ke-3, 5, 6, dan 11 berada pada cabang lain dibanding 45 observasi lainnya.
+
+2. Single Linkage dengan pemotongan berdasarkan aturan Milligan & Cooper
+
+    Dengan aturan Milligan & Cooper diperoleh 5 klaster yang terdiri atas
+    a. Observasi ke-7
+    b. Observasi A1 yang terdiri atas observasi lain selain 7, 5, 11, dan A2)
+    c. Observasi ke-5
+    d. Observasi ke-11
+    e. Observasi A2 yang terdiri atas ke-3 dan 9
+
+3. Single Linkage dengan pemotongan berdasarkan aturan Mojena
+    Dengan aturan Milligan & Cooper diperoleh 5 klaster yang terdiri atas
+    a. Observasi ke-7
+    b. Observasi ke-28
+
+**Kesimpulan yang dapat Diambil**
+  Dengan meninjau luas daerah dan populasi dari setiap negara bagian dipilih hasil dengan menggunakan aturan        Mojena dengan membagi menjadi 5 klaster
+  Diperoleh pembagian klaster yang berdasarkan atas 
+  
+  1. Klaster 1 (Observasi ke-7)
+  
+    Luas Wilayah Besar
+    Jumlah Populasi Kecil
+
+  2. Klaster 2 (Observasi ke-A1)
+  
+    Luas Wilayah Sedang
+    Jumlah Populasi Sedang
+
+  3. Klaster 3 (Observasi ke-5)
+  
+    Luas Wilayah Kecil
+    Jumlah Populasi Kecil
+  
+  4. Klaster 4 (Observasi ke-11)
+  
+    Luas Wilayah Besar
+    Jumlah Populasi Besar
+  
+  5. Klaster 5 (Observasi ke-A2)
+  
+    Luas Wilayah Kecil 
+    Jumlah Populasi Besar
+
+
+
+
